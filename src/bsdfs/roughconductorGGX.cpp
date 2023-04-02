@@ -143,7 +143,7 @@ Spectrum eval_conductor(const vec3& wi, const vec3& wo, const float alpha_x, con
 
 		// next direction
 		Spectrum weight;
-		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, m_cap, weight), alpha_x, alpha_y, cap);
+		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, cap, weight), alpha_x, alpha_y, cap);
 		energy = energy * weight;
 		ray.updateHeight(ray.h);
 
