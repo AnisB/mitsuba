@@ -465,6 +465,7 @@ private:
     ref<Texture> m_alphaU, m_alphaV;
     bool m_sampleVisible;
     Spectrum m_eta, m_k;
+    bool m_cap;
 };
 
 /**
