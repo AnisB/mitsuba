@@ -185,7 +185,7 @@ vec3 sample_conductor(const vec3& wi, const float alpha_x, const float alpha_y, 
 
 		// next direction
 		Spectrum weight;
-		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, m_cap, weight), alpha_x, alpha_y);
+		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, cap, weight), alpha_x, alpha_y);
 		energy = energy * weight;
 		ray.updateHeight(ray.h);
 
