@@ -160,7 +160,7 @@ Spectrum eval_conductor(const vec3& wi, const vec3& wo, const float alpha_x, con
 	return 0.5f*singleScattering + multipleScattering;
 }
 
-vec3 sample_conductor(const vec3& wi, const float alpha_x, const float alpha_y, const Spectrum& m_eta, const Spectrum& m_k, const int scatteringOrderMax, Spectrum& energy)
+vec3 sample_conductor(const vec3& wi, const float alpha_x, const float alpha_y, const Spectrum& m_eta, const Spectrum& m_k, const int scatteringOrderMax, bool cap, Spectrum& energy)
 {
 	energy = Spectrum(1.0f);
 
@@ -375,7 +375,7 @@ public:
 		const float alpha_y = std::max(m_alphaV->eval(bRec.its).average(), (Float) 1e-4f);
 
 		Spectrum energy;
-		vec3 wo = sample_conductor(wi, alpha_x, alpha_y, m_eta, m_k, m_scatteringOrderMax, energy);
+		vec3 wo = sample_conductor(wi, alpha_x, alpha_y, m_eta, m_k, m_scatteringOrderMax, m_cap, energy);
 		bRec.wo.x = wo.x;
 		bRec.wo.y = wo.y;
 		bRec.wo.z = wo.z;
@@ -416,7 +416,6 @@ public:
 			<< "  specularReflectance = " << indent(m_specularReflectance->toString()) << "," << endl
 			<< "  eta = " << m_eta.toString() << "," << endl
 			<< "  k = " << m_k.toString() << endl
-			<< "  cap = " << m_cap.toString() << endl
 			<< "]";
 		return oss.str();
 	}
