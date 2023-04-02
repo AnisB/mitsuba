@@ -84,7 +84,7 @@ float MISweight_conductor(const vec3& wi, const vec3& wo, const float alpha_x, c
 	return value;
 }
 
-Spectrum eval_conductor(const vec3& wi, const vec3& wo, const float alpha_x, const float alpha_y, const Spectrum& m_eta, const Spectrum& m_k, const bool cap, const int scatteringOrderMax, const bool cap)
+Spectrum eval_conductor(const vec3& wi, const vec3& wo, const float alpha_x, const float alpha_y, const Spectrum& m_eta, const Spectrum& m_k, const int scatteringOrderMax, const bool cap)
 {
 	if(wi.z <= 0 || wo.z <= 0)
 		return Spectrum(0.0f);
