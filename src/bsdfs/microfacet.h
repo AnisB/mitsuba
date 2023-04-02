@@ -409,7 +409,7 @@ public:
         return eval(m) * Frame::cosTheta(m);
     }
 
-    Vector sample_spherical_cap(float zMin, float u0, float u1)
+    Vector sample_spherical_cap(float zMin, float u0, float u1) const
     {
         float z        = (1.0f - u1) * (1.0f - zMin) + zMin; // in (zMin, 1]
         float sinTheta = sqrt(mitsuba::math::clamp(1.0f - z * z, 0.0f, 1.0f));
@@ -421,7 +421,7 @@ public:
         return Vector(x, y, z);
     }
 
-    Vector vndf_cap_partial(const Vector &wi, float alpha_x, float alpha_y, float u0, float u1)
+    Vector vndf_cap_partial(const Vector &wi, float alpha_x, float alpha_y, float u0, float u1) const
     {
         Vector wiStd = normalize(Vector(alpha_x * wi.x, alpha_y * wi.y, wi.z));
         Vector woStd = sample_spherical_cap(-wiStd.z, u0, u1);
@@ -442,7 +442,6 @@ public:
      */
     inline Normal sampleVisible(const Vector &_wi, const Point2 &sample) const {
         
-        vec3 wm;
         // sample D_wi
         if (m_cap)
         {
