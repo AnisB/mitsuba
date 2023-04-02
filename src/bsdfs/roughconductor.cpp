@@ -192,6 +192,7 @@ public:
         MicrofacetDistribution distr(props);
         m_type = distr.getType();
         m_sampleVisible = distr.getSampleVisible();
+        m_cap = distr.getCap();
 
         m_alphaU = new ConstantFloatTexture(distr.getAlphaU());
         if (distr.getAlphaU() == distr.getAlphaV())
@@ -272,7 +273,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Evaluate the microfacet normal distribution */
@@ -310,7 +312,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         if (m_sampleVisible)
@@ -332,7 +335,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Sample M, the microfacet normal */
@@ -378,7 +382,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Sample M, the microfacet normal */

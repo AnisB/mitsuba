@@ -64,8 +64,8 @@ public:
      * \param alpha
      *     The surface roughness
      */
-    inline MicrofacetDistribution(EType type, Float alpha, bool sampleVisible = true)
-        : m_type(type), m_alphaU(alpha), m_alphaV(alpha), m_sampleVisible(sampleVisible),
+    inline MicrofacetDistribution(EType type, Float alpha, bool sampleVisible = true, bool cap = false)
+        : m_type(type), m_alphaU(alpha), m_alphaV(alpha), m_sampleVisible(sampleVisible), m_cap(cap),
           m_exponentU(0.0f), m_exponentV(0.0f) {
         m_alphaU = std::max(m_alphaU, (Float) 1e-4f);
         m_alphaV = std::max(m_alphaV, (Float) 1e-4f);
@@ -83,8 +83,8 @@ public:
      * \param alphaV
      *     The surface roughness in the bitangent direction
      */
-    inline MicrofacetDistribution(EType type, Float alphaU, Float alphaV, bool sampleVisible = true)
-        : m_type(type), m_alphaU(alphaU), m_alphaV(alphaV), m_sampleVisible(sampleVisible),
+    inline MicrofacetDistribution(EType type, Float alphaU, Float alphaV, bool sampleVisible = true, bool cap = false)
+        : m_type(type), m_alphaU(alphaU), m_alphaV(alphaV), m_sampleVisible(sampleVisible), m_cap(cap),
           m_exponentU(0.0f), m_exponentV(0.0f) {
         m_alphaU = std::max(m_alphaU, (Float) 1e-4f);
         m_alphaV = std::max(m_alphaV, (Float) 1e-4f);
@@ -97,7 +97,7 @@ public:
      * structure
      */
     MicrofacetDistribution(const Properties &props, EType type = EBeckmann,
-        Float alphaU = 0.1f, Float alphaV = 0.1f, bool sampleVisible = true)
+        Float alphaU = 0.1f, Float alphaV = 0.1f, bool sampleVisible = true, bool cap = false)
         : m_type(type), m_alphaU(alphaU), m_alphaV(alphaV), m_exponentU(0.0f),
           m_exponentV(0.0f) {
 
@@ -136,6 +136,7 @@ public:
         m_alphaV = std::max(m_alphaV, (Float) 1e-4f);
 
         m_sampleVisible = props.getBoolean("sampleVisible", sampleVisible);
+        m_cap = props.getBoolean("cap", cap);
 
         /* Visible normal sampling is not supported for the Phong / Ashikhmin-Shirley distribution */
         if (m_type == EPhong) {
@@ -167,6 +168,8 @@ public:
 
     /// Return whether or not only visible normals are sampled?
     inline bool getSampleVisible() const { return m_sampleVisible; }
+
+    inline bool getCap() const { return m_cap; }
 
     /// Is this an anisotropic microfacet distribution?
     inline bool isAnisotropic() const { return m_alphaU != m_alphaV; }
@@ -406,6 +409,25 @@ public:
         return eval(m) * Frame::cosTheta(m);
     }
 
+    vec3 sample_spherical_cap(float zMin, float u0, float u1)
+    {
+        float z        = (1.0f - u1) * (1.0f - zMin) + zMin; // in (zMin, 1]
+        float sinTheta = sqrt(mitsuba::math::clamp(1.0f - z * z, 0.0f, 1.0f));
+        float phi      = u0 * 2.0f * M_PI;
+        float sinPhi = sinf(phi);
+        float cosPhi = cosf(phi);
+        float x                  = cosPhi * sinTheta;
+        float y                  = sinPhi * sinTheta;
+        return vec3(x, y, z);
+    }
+
+    vec3 vndf_cap_partial(const vec3 &wi, float alpha_x, float alpha_y, float u0, float u1)
+    {
+        vec3 wiStd = normalize(vec3(alpha_x * wi.x, alpha_y * wi.y, wi.z));
+        vec3 woStd = sample_spherical_cap(-wiStd.z, u0, u1);
+        vec3 wm    = woStd + wiStd;
+        return vec3(alpha_x * wm.x, alpha_y * wm.y, wm.z);
+    }
 
     /**
      * \brief Draw a sample from the distribution of visible normals
@@ -419,43 +441,53 @@ public:
      *    The probability density wrt. solid angles
      */
     inline Normal sampleVisible(const Vector &_wi, const Point2 &sample) const {
-        /* Step 1: stretch wi */
-        Vector wi = normalize(Vector(
-            m_alphaU * _wi.x,
-            m_alphaV * _wi.y,
-            _wi.z
-        ));
-
-        /* Get polar coordinates */
-        Float theta = 0, phi = 0;
-        if (wi.z < (Float) 0.99999) {
-            theta = std::acos(wi.z);
-            phi = std::atan2(wi.y, wi.x);
+        
+        vec3 wm;
+        // sample D_wi
+        if (m_cap)
+        {
+            return Normal(normalize(vndf_cap_partial(wi, alpha_x, alpha_y, U1, U2)));
         }
-        Float sinPhi, cosPhi;
-        math::sincos(phi, &sinPhi, &cosPhi);
+        else
+        {
+            /* Step 1: stretch wi */
+            Vector wi = normalize(Vector(
+                m_alphaU * _wi.x,
+                m_alphaV * _wi.y,
+                _wi.z
+            ));
 
-        /* Step 2: simulate P22_{wi}(slope.x, slope.y, 1, 1) */
-        Vector2 slope = sampleVisible11(theta, sample);
+            /* Get polar coordinates */
+            Float theta = 0, phi = 0;
+            if (wi.z < (Float) 0.99999) {
+                theta = std::acos(wi.z);
+                phi = std::atan2(wi.y, wi.x);
+            }
+            Float sinPhi, cosPhi;
+            math::sincos(phi, &sinPhi, &cosPhi);
 
-        /* Step 3: rotate */
-        slope = Vector2(
-            cosPhi * slope.x - sinPhi * slope.y,
-            sinPhi * slope.x + cosPhi * slope.y);
+            /* Step 2: simulate P22_{wi}(slope.x, slope.y, 1, 1) */
+            Vector2 slope = sampleVisible11(theta, sample);
 
-        /* Step 4: unstretch */
-        slope.x *= m_alphaU;
-        slope.y *= m_alphaV;
+            /* Step 3: rotate */
+            slope = Vector2(
+                cosPhi * slope.x - sinPhi * slope.y,
+                sinPhi * slope.x + cosPhi * slope.y);
 
-        /* Step 5: compute normal */
-        Float normalization = (Float) 1 / std::sqrt(slope.x*slope.x
-                + slope.y*slope.y + (Float) 1.0);
+            /* Step 4: unstretch */
+            slope.x *= m_alphaU;
+            slope.y *= m_alphaV;
 
-        return Normal(
-            -slope.x * normalization,
-            -slope.y * normalization,
-            normalization
-        );
+            /* Step 5: compute normal */
+            Float normalization = (Float) 1 / std::sqrt(slope.x*slope.x
+                    + slope.y*slope.y + (Float) 1.0);
+
+            return Normal(
+                -slope.x * normalization,
+                -slope.y * normalization,
+                normalization
+            );
+        }
     }
 
     /// Implements the probability density of the function \ref sampleVisible()
@@ -718,6 +750,7 @@ protected:
     Float m_alphaU, m_alphaV;
     bool m_sampleVisible;
     Float m_exponentU, m_exponentV;
+    bool m_cap;
 };
 
 MTS_NAMESPACE_END
