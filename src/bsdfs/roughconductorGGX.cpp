@@ -8,7 +8,7 @@ MTS_NAMESPACE_BEGIN
 
 #include "roughGGX.h"
 
-vec3 samplePhaseFunction_conductor(const vec3& wi, const float alpha_x, const float alpha_y, bool cap, const Spectrum& m_eta, const Spectrum& m_k, Spectrum& weight)
+vec3 samplePhaseFunction_conductor(const vec3& wi, const float alpha_x, const float alpha_y, const Spectrum& m_eta, const Spectrum& m_k, bool cap, Spectrum& weight)
 {
 	const float U1 = generateRandomNumber();
 	const float U2 = generateRandomNumber();
@@ -143,7 +143,7 @@ Spectrum eval_conductor(const vec3& wi, const vec3& wo, const float alpha_x, con
 
 		// next direction
 		Spectrum weight;
-		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, weight), alpha_x, alpha_y, cap);
+		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, m_cap, weight), alpha_x, alpha_y, cap);
 		energy = energy * weight;
 		ray.updateHeight(ray.h);
 
@@ -185,7 +185,7 @@ vec3 sample_conductor(const vec3& wi, const float alpha_x, const float alpha_y, 
 
 		// next direction
 		Spectrum weight;
-		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, weight), alpha_x, alpha_y);
+		ray.updateDirection(samplePhaseFunction_conductor(-ray.w, alpha_x, alpha_y, m_eta, m_k, m_cap, weight), alpha_x, alpha_y);
 		energy = energy * weight;
 		ray.updateHeight(ray.h);
 
@@ -416,6 +416,7 @@ public:
 			<< "  specularReflectance = " << indent(m_specularReflectance->toString()) << "," << endl
 			<< "  eta = " << m_eta.toString() << "," << endl
 			<< "  k = " << m_k.toString() << endl
+			<< "  cap = " << m_cap.toString() << endl
 			<< "]";
 		return oss.str();
 	}
