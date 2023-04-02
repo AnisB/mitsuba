@@ -409,7 +409,7 @@ public:
         return eval(m) * Frame::cosTheta(m);
     }
 
-    vec3 sample_spherical_cap(float zMin, float u0, float u1)
+    Vector sample_spherical_cap(float zMin, float u0, float u1)
     {
         float z        = (1.0f - u1) * (1.0f - zMin) + zMin; // in (zMin, 1]
         float sinTheta = sqrt(mitsuba::math::clamp(1.0f - z * z, 0.0f, 1.0f));
@@ -418,15 +418,15 @@ public:
         float cosPhi = cosf(phi);
         float x                  = cosPhi * sinTheta;
         float y                  = sinPhi * sinTheta;
-        return vec3(x, y, z);
+        return Vector(x, y, z);
     }
 
-    vec3 vndf_cap_partial(const vec3 &wi, float alpha_x, float alpha_y, float u0, float u1)
+    Vector vndf_cap_partial(const Vector &wi, float alpha_x, float alpha_y, float u0, float u1)
     {
-        vec3 wiStd = normalize(vec3(alpha_x * wi.x, alpha_y * wi.y, wi.z));
-        vec3 woStd = sample_spherical_cap(-wiStd.z, u0, u1);
-        vec3 wm    = woStd + wiStd;
-        return vec3(alpha_x * wm.x, alpha_y * wm.y, wm.z);
+        Vector wiStd = normalize(Vector(alpha_x * wi.x, alpha_y * wi.y, wi.z));
+        Vector woStd = sample_spherical_cap(-wiStd.z, u0, u1);
+        Vector wm    = woStd + wiStd;
+        return Vector(alpha_x * wm.x, alpha_y * wm.y, wm.z);
     }
 
     /**
@@ -446,7 +446,7 @@ public:
         // sample D_wi
         if (m_cap)
         {
-            return Normal(normalize(vndf_cap_partial(wi, alpha_x, alpha_y, U1, U2)));
+            return Normal(normalize(vndf_cap_partial(_wi, m_alphaU, m_alphaV, sample.x, sample.y)));
         }
         else
         {
