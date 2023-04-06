@@ -404,7 +404,7 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
             m_cap
         );
 
