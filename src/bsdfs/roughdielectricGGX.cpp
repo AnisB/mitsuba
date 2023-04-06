@@ -79,38 +79,43 @@ float evalPhaseFunction_dielectric(const RayInfo& ray, const vec3& wo, const boo
 }
 
 // by convention, wi is always outside
-vec3 samplePhaseFunction_dielectric(const vec3& wi, const float alpha_x, const float alpha_y, const float eta, bool& wo_outside) 
+vec3 samplePhaseFunction_dielectric(const vec3& wi, const float alpha_x, const float alpha_y, const float eta, bool cap, bool& wo_outside) 
 {
 	const float U1 = generateRandomNumber();
 	const float U2 = generateRandomNumber();
 
-	// sample D_wi
+    vec3 wm;
+    // sample D_wi
+    if (cap)
+    {
+        wm = normalize(vndf_cap_partial(wi, alpha_x, alpha_y, U1, U2));
+    }
+    else
+    {
+		// stretch to match configuration with alpha=1.0	
+		const vec3 wi_11 = normalize(vec3(alpha_x * wi.x, alpha_y * wi.y, wi.z));
 
-	// stretch to match configuration with alpha=1.0	
-	const vec3 wi_11 = normalize(vec3(alpha_x * wi.x, alpha_y * wi.y, wi.z));
+		// sample visible slope with alpha=1.0
+		vec2 slope_11 = sampleP22_11(acosf(wi_11.z), U1, U2, alpha_x, alpha_y);
 
-	// sample visible slope with alpha=1.0
-	vec2 slope_11 = sampleP22_11(acosf(wi_11.z), U1, U2, alpha_x, alpha_y);
+		// align with view direction
+		const float phi = atan2(wi_11.y, wi_11.x);
+		vec2 slope(cosf(phi)*slope_11.x - sinf(phi)*slope_11.y, sinf(phi)*slope_11.x + cos(phi)*slope_11.y, 0.0f);
 
-	// align with view direction
-	const float phi = atan2(wi_11.y, wi_11.x);
-	vec2 slope(cosf(phi)*slope_11.x - sinf(phi)*slope_11.y, sinf(phi)*slope_11.x + cos(phi)*slope_11.y, 0.0f);
+		// stretch back
+		slope.x *= alpha_x;
+		slope.y *= alpha_y;
 
-	// stretch back
-	slope.x *= alpha_x;
-	slope.y *= alpha_y;
-
-	// compute normal
-	vec3 wm;
-	// if numerical instability
-	if( (slope.x != slope.x) || !IsFiniteNumber(slope.x) ) 
-	{
-		if(wi.z > 0) wm = vec3(0.0f,0.0f,1.0f);
-		else wm = normalize(vec3(wi.x, wi.y, 0.0f));
-	}
-	else
-		wm = normalize(vec3(-slope.x, -slope.y, 1.0f));
-
+		// if numerical instability
+		if( (slope.x != slope.x) || !IsFiniteNumber(slope.x) ) 
+		{
+			if(wi.z > 0) wm = vec3(0.0f,0.0f,1.0f);
+			else wm = normalize(vec3(wi.x, wi.y, 0.0f));
+		}
+		else
+			wm = normalize(vec3(-slope.x, -slope.y, 1.0f));
+    }
+	
 	const float F = Fresnel(wi, wm, eta);
 
 	if( generateRandomNumber() < F )
@@ -146,7 +151,7 @@ float MISweight_dielectric(const vec3& wi, const vec3& wo, const bool wo_outside
 	}
 }
 
-float eval_dielectric(const vec3& wi, const vec3& wo, const bool wo_outside, const float alpha_x, const float alpha_y, const float eta, const int scatteringOrderMax)
+float eval_dielectric(const vec3& wi, const vec3& wo, const bool wo_outside, const float alpha_x, const float alpha_y, const float eta, const int scatteringOrderMax, bool cap)
 {
 	if( (wi.z <= 0) || (wo.z <= 0 && wo_outside) || (wo.z >= 0 && !wo_outside))
 		return 0.0f;
@@ -226,7 +231,7 @@ float eval_dielectric(const vec3& wi, const vec3& wo, const bool wo_outside, con
 
 		// next direction
 		bool next_outside;
-		vec3 w = samplePhaseFunction_dielectric(-ray.w, alpha_x, alpha_y, (outside ? eta:1.0f/eta), next_outside);
+		vec3 w = samplePhaseFunction_dielectric(-ray.w, alpha_x, alpha_y, (outside ? eta:1.0f/eta), cap, next_outside);
 		if (next_outside)
 		{
 			ray.updateDirection(w, alpha_x, alpha_y);
@@ -252,7 +257,7 @@ float eval_dielectric(const vec3& wi, const vec3& wo, const bool wo_outside, con
 	return 0.5f * singleScattering + multipleScattering;
 }
 
-vec3 sample_dielectric(const vec3& wi, const float alpha_x, const float alpha_y, const float eta, const int scatteringOrderMax, float& weight)
+vec3 sample_dielectric(const vec3& wi, const float alpha_x, const float alpha_y, const float eta, const int scatteringOrderMax, bool cap, float& weight)
 {
 	// init
 	RayInfo ray;
@@ -276,7 +281,7 @@ vec3 sample_dielectric(const vec3& wi, const float alpha_x, const float alpha_y,
 
 		// next direction
 		bool next_outside;
-		vec3 w = samplePhaseFunction_dielectric(-ray.w, alpha_x, alpha_y, (outside ? eta:1.0f/eta), next_outside);
+		vec3 w = samplePhaseFunction_dielectric(-ray.w, alpha_x, alpha_y, (outside ? eta:1.0f/eta), cap, next_outside);
 		if (next_outside)
 		{
 			ray.updateDirection(w, alpha_x, alpha_y);
@@ -354,6 +359,7 @@ public:
 
 		// scattering order
 		m_scatteringOrderMax = props.getInteger("scatteringOrderMax", 10);
+		m_cap = props.getBoolean("cap", false);
 	}
 
 	RoughDielectric(Stream *stream, InstanceManager *manager)
@@ -427,15 +433,15 @@ public:
 			if( Frame::cosTheta(bRec.wo) >= 0 )
 			{
 				float value = (generateRandomNumber() > 0.5f) ? 
-							2.0f * eval_dielectric(wi, wo, true , alpha_x, alpha_y, m_eta, m_scatteringOrderMax) :
-							2.0f * eval_dielectric(wo, wi, true, alpha_x, alpha_y, m_eta, m_scatteringOrderMax) / Frame::cosTheta(bRec.wi) * Frame::cosTheta(bRec.wo);
+							2.0f * eval_dielectric(wi, wo, true , alpha_x, alpha_y, m_eta, m_scatteringOrderMax, m_cap) :
+							2.0f * eval_dielectric(wo, wi, true, alpha_x, alpha_y, m_eta, m_scatteringOrderMax, m_cap) / Frame::cosTheta(bRec.wi) * Frame::cosTheta(bRec.wo);
 				return Spectrum(value);
 			}
 			else
 			{
 				float value = (generateRandomNumber() > 0.5f) ? 
-							2.0f * eval_dielectric(wi, wo, false , alpha_x, alpha_y, m_eta, m_scatteringOrderMax) :
-							2.0f * eval_dielectric(-wo, -wi, false, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax) / Frame::cosTheta(bRec.wi) * Frame::cosTheta(-bRec.wo) / (factor*factor);
+							2.0f * eval_dielectric(wi, wo, false , alpha_x, alpha_y, m_eta, m_scatteringOrderMax, m_cap) :
+							2.0f * eval_dielectric(-wo, -wi, false, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, m_cap) / Frame::cosTheta(bRec.wi) * Frame::cosTheta(-bRec.wo) / (factor*factor);
 				return Spectrum(value) * ((Frame::cosTheta(bRec.wo) > 0) ? 1.0f : factor * factor);
 			}			
 		}
@@ -444,15 +450,15 @@ public:
 			if(Frame::cosTheta(bRec.wo) <= 0)
 			{
 				float value = (generateRandomNumber() > 0.5f) ? 
-							2.0f * eval_dielectric(-wi, -wo, true , alpha_x, alpha_y, m_invEta, m_scatteringOrderMax) :
-							2.0f * eval_dielectric(-wo, -wi, true, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax) / Frame::cosTheta(-bRec.wi) * Frame::cosTheta(-bRec.wo);
+							2.0f * eval_dielectric(-wi, -wo, true , alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, m_cap) :
+							2.0f * eval_dielectric(-wo, -wi, true, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, m_cap) / Frame::cosTheta(-bRec.wi) * Frame::cosTheta(-bRec.wo);
 				return Spectrum(value);
 			}
 			else
 			{
 				float value = (generateRandomNumber() > 0.5f) ? 
-							2.0f * eval_dielectric(-wi, -wo, false , alpha_x, alpha_y, m_invEta, m_scatteringOrderMax) :
-							2.0f * eval_dielectric(wo, wi, false , alpha_x, alpha_y, m_eta, m_scatteringOrderMax)/ Frame::cosTheta(-bRec.wi) * Frame::cosTheta(bRec.wo) / (factor*factor);
+							2.0f * eval_dielectric(-wi, -wo, false , alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, m_cap) :
+							2.0f * eval_dielectric(wo, wi, false , alpha_x, alpha_y, m_eta, m_scatteringOrderMax, m_cap)/ Frame::cosTheta(-bRec.wi) * Frame::cosTheta(bRec.wo) / (factor*factor);
 				return Spectrum(value) * ((Frame::cosTheta(bRec.wo) < 0) ? 1.0f : factor * factor);
 			}
 		}
@@ -552,7 +558,7 @@ public:
 		if ( Frame::cosTheta(bRec.wi) > 0 ) // outside
 		{
 			float weight;
-			vec3 wo = sample_dielectric(wi, alpha_x, alpha_y, m_eta, m_scatteringOrderMax, weight);
+			vec3 wo = sample_dielectric(wi, alpha_x, alpha_y, m_eta, m_scatteringOrderMax, m_cap, weight);
 							
 			bRec.wo.x = wo.x;
 			bRec.wo.y = wo.y;
@@ -580,7 +586,7 @@ public:
 		else // inside
 		{
 			float weight;
-			vec3 wo = -sample_dielectric(-wi, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, weight);
+			vec3 wo = -sample_dielectric(-wi, alpha_x, alpha_y, m_invEta, m_scatteringOrderMax, m_cap, weight);
 
 			bRec.wo.x = wo.x;
 			bRec.wo.y = wo.y;
@@ -657,6 +663,7 @@ private:
 	ref<Texture> m_alphaU, m_alphaV;
 	Float m_eta, m_invEta;
 	int m_scatteringOrderMax;
+	bool m_cap;
 };
 
 /* Fake glass shader -- it is really hopeless to visualize
