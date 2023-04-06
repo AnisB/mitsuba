@@ -202,6 +202,7 @@ public:
         MicrofacetDistribution distr(props);
         m_type = distr.getType();
         m_sampleVisible = distr.getSampleVisible();
+        m_cap = distr.getCap();
 
         m_alphaU = new ConstantFloatTexture(distr.getAlphaU());
         if (distr.getAlphaU() == distr.getAlphaV())
@@ -214,6 +215,7 @@ public:
      : BSDF(stream, manager) {
         m_type = (MicrofacetDistribution::EType) stream->readUInt();
         m_sampleVisible = stream->readBool();
+        m_cap = stream->readBool();
         m_alphaU = static_cast<Texture *>(manager->getInstance(stream));
         m_alphaV = static_cast<Texture *>(manager->getInstance(stream));
         m_specularReflectance = static_cast<Texture *>(manager->getInstance(stream));
@@ -229,6 +231,7 @@ public:
 
         stream->writeUInt((uint32_t) m_type);
         stream->writeBool(m_sampleVisible);
+        stream->writeBool(m_cap);
         manager->serialize(stream, m_alphaU.get());
         manager->serialize(stream, m_alphaV.get());
         manager->serialize(stream, m_specularReflectance.get());
@@ -307,7 +310,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Evaluate the microfacet normal distribution */
@@ -401,6 +405,7 @@ public:
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
             m_sampleVisible
+            m_cap
         );
 
         /* Trick by Walter et al.: slightly scale the roughness values to
@@ -439,7 +444,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Trick by Walter et al.: slightly scale the roughness values to
@@ -528,7 +534,8 @@ public:
             m_type,
             m_alphaU->eval(bRec.its).average(),
             m_alphaV->eval(bRec.its).average(),
-            m_sampleVisible
+            m_sampleVisible,
+            m_cap
         );
 
         /* Trick by Walter et al.: slightly scale the roughness values to
@@ -667,6 +674,7 @@ private:
     ref<Texture> m_alphaU, m_alphaV;
     Float m_eta, m_invEta;
     bool m_sampleVisible;
+    bool m_cap;
 };
 
 /* Fake glass shader -- it is really hopeless to visualize
